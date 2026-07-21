@@ -1,0 +1,12 @@
+=== Reproducibility Log ===
+OS: Darwin 25.3.0 (Darwin Kernel Version 25.3.0: Wed Jan 28 20:54:22 PST 2026; root:xnu-12377.81.4~5/RELEASE_ARM64_T8112)
+Python Version: 3.12.8 | packaged by conda-forge | (main, Dec  5 2024, 14:19:53) [Clang 18.1.8 ]
+Pandas Version: 2.3.3
+NumPy Version: 2.4.6
+SciPy Version: 1.18.0
+HeartPy Version: Version 1.2.6
+NeuroKit2 Version: 0.2.13
+Git Commit: Unknown/Not a Git repository
+
+=== Random Seeds ===
+Noise generation uses static seeds within `noise_robustness.py` (np.random.seed).
