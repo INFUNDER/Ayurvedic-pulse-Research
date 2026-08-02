@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.signal
 from scipy.stats import skew, kurtosis
-from config import SQI_GOOD_THRESHOLD, SQI_MODERATE_THRESHOLD
+from pulse_core.config import SQI_GOOD_THRESHOLD, SQI_MODERATE_THRESHOLD
 
 def _calculate_acf_peak(signal, fs):
     """

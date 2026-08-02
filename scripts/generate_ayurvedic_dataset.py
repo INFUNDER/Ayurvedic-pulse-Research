@@ -1,12 +1,16 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import os
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-from dataset_loader import load_metadata, load_subject_segments
-from beat_detection import ClinicalDetector
-from feature_extraction import extract_all_features
-from ayurveda_mapper import map_to_ayurveda
+from pulse_core.dataset_loader import load_metadata, load_subject_segments
+from pulse_core.beat_detection import ClinicalDetector
+from pulse_core.feature_extraction import extract_all_features
+from ayurveda.ayurveda_mapper import map_to_ayurveda
 
 def process_subject(subject_id):
     segments = load_subject_segments(subject_id)

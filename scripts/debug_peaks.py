@@ -1,6 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import scipy.signal
-from sensor import load_custom_data
+from pulse_core.sensor import load_custom_data
 
 sensor_data = load_custom_data("data/custom_radial/subject_custom_1000hz.csv")
 sig = sensor_data.signal

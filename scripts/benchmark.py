@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import os
 import time
 import tracemalloc
@@ -13,14 +17,14 @@ import subprocess
 import heartpy as hp
 import neurokit2 as nk
 
-from sensor import load_bidmc_data, load_mimic_data, load_wesad_data, load_dalia_data
-from noise_removal import remove_noise
-from beat_detection import detect_beats
-from feature_extraction import extract_all_features
-from metrics import extract_ecg_r_peaks, evaluate_beat_detection
+from pulse_core.sensor import load_bidmc_data, load_mimic_data, load_wesad_data, load_dalia_data
+from pulse_core.noise_removal import remove_noise
+from pulse_core.beat_detection import detect_beats
+from pulse_core.feature_extraction import extract_all_features
+from pulse_core.metrics import extract_ecg_r_peaks, evaluate_beat_detection
 from noise_robustness import (add_gaussian_noise, add_baseline_wander, 
                               add_powerline_interference, add_motion_artifact)
-from sqi import calculate_sqi, evaluate_signal_quality
+from pulse_core.sqi import calculate_sqi, evaluate_signal_quality
 
 WINDOW_SEC = 300 # 5 minutes
 FAILURE_DIR = "failure_analysis"

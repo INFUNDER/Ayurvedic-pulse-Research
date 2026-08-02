@@ -1,11 +1,15 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import time
-from calibration import DoshaCalibrator, bandpass_filter
-from beat_detection import WearableDetector
-from sqi import calculate_sqi, evaluate_signal_quality
-from feature_extraction import extract_all_features
-from ayurveda_mapper import map_to_ayurveda
-from sensor import load_custom_data
+from ayurveda.calibration import DoshaCalibrator, bandpass_filter
+from pulse_core.beat_detection import WearableDetector
+from pulse_core.sqi import calculate_sqi, evaluate_signal_quality
+from pulse_core.feature_extraction import extract_all_features
+from ayurveda.ayurveda_mapper import map_to_ayurveda
+from pulse_core.sensor import load_custom_data
 import warnings
 
 # Configuration

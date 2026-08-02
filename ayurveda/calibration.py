@@ -1,7 +1,7 @@
 import numpy as np
-from feature_extraction import extract_all_features
-from beat_detection import WearableDetector
-from sqi import calculate_sqi, evaluate_signal_quality
+from pulse_core.feature_extraction import extract_all_features
+from pulse_core.beat_detection import WearableDetector
+from pulse_core.sqi import calculate_sqi, evaluate_signal_quality
 import warnings
 from scipy.signal import butter, sosfiltfilt
 

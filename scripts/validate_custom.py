@@ -1,13 +1,17 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from sensor import load_custom_data
-from noise_removal import remove_noise
-from sqi import calculate_sqi, evaluate_signal_quality
-from beat_detection import detect_beats
-from feature_extraction import extract_all_features
+from pulse_core.sensor import load_custom_data
+from pulse_core.noise_removal import remove_noise
+from pulse_core.sqi import calculate_sqi, evaluate_signal_quality
+from pulse_core.beat_detection import detect_beats
+from pulse_core.feature_extraction import extract_all_features
 
 def main():
     csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'custom_radial', 'subject_custom_001.csv')

@@ -1,6 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import matplotlib.pyplot as plt
-from sensor import load_custom_data
+from pulse_core.sensor import load_custom_data
 from scipy.signal import butter, sosfiltfilt
 
 def bandpass_filter(data, lowcut, highcut, fs, order=4):

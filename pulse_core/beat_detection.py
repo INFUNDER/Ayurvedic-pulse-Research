@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.signal
-from sqi import calculate_sqi, evaluate_signal_quality
-from core_types import DetectionResult, BaseDetector
+from pulse_core.sqi import calculate_sqi, evaluate_signal_quality
+from pulse_core.core_types import DetectionResult, BaseDetector
 
 class ClinicalDetector(BaseDetector):
     """

@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import matplotlib.pyplot as plt
 from .sensor import load_bidmc_data, load_synthetic_data
 from .noise_removal import remove_noise

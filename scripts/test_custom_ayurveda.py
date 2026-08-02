@@ -1,8 +1,12 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
-from sensor import load_custom_data
-from beat_detection import WearableDetector
-from feature_extraction import extract_all_features
-from ayurveda_mapper import map_to_ayurveda
+from pulse_core.sensor import load_custom_data
+from pulse_core.beat_detection import WearableDetector
+from pulse_core.feature_extraction import extract_all_features
+from ayurveda.ayurveda_mapper import map_to_ayurveda
 from scipy.signal import butter, sosfiltfilt
 
 def bandpass_filter(data, lowcut, highcut, fs, order=4):
