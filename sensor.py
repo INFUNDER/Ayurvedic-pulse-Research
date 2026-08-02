@@ -172,3 +172,33 @@ def load_dalia_data(pkl_path):
         reference_ecg=ecg_sig,
         reference_ecg_fs=ecg_fs
     )
+
+def load_custom_data(csv_path):
+    import pandas as pd
+    import numpy as np
+    import os
+    
+    df = pd.read_csv(csv_path)
+    
+    # Calculate empirical sampling rate from timestamps (in milliseconds)
+    # Using the median diff is robust to occasional jitter in serial comms
+    ts = df['Timestamp_ms'].values
+    median_dt_ms = np.median(np.diff(ts))
+    fs = 1000.0 / median_dt_ms if median_dt_ms > 0 else 100.0
+    
+    # The MAX30102 has Red and IR. IR is typically slightly cleaner for pulse on the wrist/finger,
+    # but we can try Red first or invert it if necessary. Let's use Red for now, but invert it if 
+    # it resembles a transmittance rather than reflectance (usually MAX30102 requires inversion 
+    # for standard peak detection since more blood = less light = lower ADC value).
+    # We will simply pass the raw IR signal (often better for heart rate) and invert it.
+    signal = -df['IR'].values 
+    
+    subject_id = os.path.basename(csv_path).replace('.csv', '')
+    
+    return SensorData(
+        signal=signal,
+        fs=fs,
+        reference_ecg=None,
+        reference_ecg_fs=None,
+        label=subject_id
+    )

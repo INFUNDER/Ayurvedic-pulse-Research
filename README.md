@@ -9,6 +9,13 @@ This repository contains a modular, signal-quality-aware research platform for e
   - `WearableDetector`: Adaptive dual-moving-average pipeline with local SNR rejection for noisy, wearable data.
 - **Robust Feature Extraction**: Extracts time-domain, frequency-domain, and non-linear morphological features.
 - **Failure Taxonomy Tracker**: Explicitly logs failure modes (e.g., Missing Fiducials, Low SNR, Numerical Instability) for downstream analysis.
+- **Real-Time Ayurvedic Dosha Pipeline**: 
+  - Live processing of Vata and Pitta sensors (MAX30102) with spatial resolution maintained.
+  - 60-second dynamic baseline calibration to adapt to physiological variance.
+  - Continuous 10-second rolling window classification mapping scientific hemodynamic features (e.g. Augmentation Index, Stiffness Index) to traditional parameters (Vega, Gati, Tala, Bala, Kathinya, Akruti).
+
+## Documentation
+- [Dosha Classification Walkthrough](docs/dosha_classification/walkthrough.md)
 
 ## Version
-- Current: v1.0 (Architecture Freeze)
+- Current: v1.1 (Dual-Sensor Nadi Pariksha Architecture)

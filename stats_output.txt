@@ -1,0 +1,40 @@
+
+--- Feature Extraction Success & Failure Modes ---
+| Feature          |   Success % |   Signal Rejected % |   Low Confidence % |   Missing Fiducials % |   Num. Instability % |
+|:-----------------|------------:|--------------------:|-------------------:|----------------------:|---------------------:|
+| Heart_Rate_BPM   |       100   |                   0 |                0   |                   0   |                  0   |
+| HRV_RMSSD        |       100   |                   0 |                0   |                   0   |                  0   |
+| HRV_SDNN         |       100   |                   0 |                0   |                   0   |                  0   |
+| Sample_Entropy   |       100   |                   0 |                0   |                   0   |                  0   |
+| Mean_Width_at_50 |        42.9 |                   0 |                0   |                   0   |                 57.1 |
+| APG_Aging_Index  |         0   |                   0 |               57.1 |                  42.9 |                  0   |
+
+--- Signal Quality Confusion Matrix (Composite SQI) ---
+| Condition_Type   |   Good |   Moderate |
+|:-----------------|-------:|-----------:|
+| Baseline_Wander  |   33.3 |       66.7 |
+| Clean            |   33.3 |       66.7 |
+| Downsampled      |   33.3 |       66.7 |
+| Gaussian_20dB    |   33.3 |       66.7 |
+| Motion_Artifact  |  100   |        0   |
+| Powerline_50Hz   |   33.3 |       66.7 |
+
+--- Detector Routing ---
+| Detector_Used   |   proportion |
+|:----------------|-------------:|
+| wearable        |         57.1 |
+| clinical        |         42.9 |
+
+--- Failure Taxonomy (F1 < 0.50 or Rejected) ---
+| Failure_Type   |   proportion |
+|:---------------|-------------:|
+| Baseline drift |          100 |
+
+--- 95% Confidence Intervals for F1 Score (Clean) ---
+BIDMC (Our Auto): 0.9823 ± 0.0070
+WESAD (Our Auto): 0.3824 (Not enough samples for CI)
+PPG-DaLiA (Our Auto): 0.6035 ± 0.3157
+
+--- Wilcoxon Signed-Rank Test (Clean Data) ---
+Ours vs HeartPy: p-value = 4.3750e-01
+Ours vs Elgendi: p-value = 2.1875e-01
