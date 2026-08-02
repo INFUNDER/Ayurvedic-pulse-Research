@@ -1,46 +1,61 @@
-# Ayurvedic-Pulse-Research
+# Ayurvedic Nadi Pariksha (Pulse Diagnosis) System
 
-This repository contains a modular, signal-quality-aware research platform for extracting physiological features from pulse signals (e.g., PPG, pressure sensors). It is specifically designed to overcome the challenges of wearable artifacts by dynamically routing signals based on a composite Signal Quality Index (SQI) and providing robust feature extraction tailored for downstream machine learning tasks, such as Ayurvedic Dosha prediction.
+This repository contains a complete hardware and software pipeline designed for real-time Ayurvedic Dosha Classification (Vata, Pitta, Kapha) using optical PPG sensors (MAX30102). 
+
+By extracting advanced hemodynamic features from the human pulse wave, this system mathematically maps scientific cardiovascular metrics to the traditional Ayurvedic parameters described in ancient texts (Vega, Gati, Tala, Bala, Kathinya, and Akruti).
 
 ## Repository Structure
 
-To make this codebase as approachable as possible, we have cleanly separated core logic from executable scripts:
+To make this codebase approachable for new researchers and developers, the logic is cleanly separated:
 
 ```text
 pulse_acquisition_system/
-├── pulse_core/                 # Core DSP & Signal Processing Modules
-│   ├── feature_extraction.py
-│   ├── beat_detection.py
-│   ├── sqi.py
-│   └── ...
-├── ayurveda/                   # Nadi Pariksha Ayurvedic Logic
-│   ├── ayurveda_mapper.py
-│   └── calibration.py
+├── ayurveda/                   # Nadi Pariksha Ayurvedic Logic (The Core Focus)
+│   ├── ayurveda_mapper.py      # Maps hemodynamic features to Vata/Pitta/Kapha
+│   └── calibration.py          # 60-second baseline stabilization
 ├── scripts/                    # Executable Entry Points
-│   ├── realtime_pipeline.py    # Main real-time dual-sensor pipeline
-│   ├── benchmark.py
+│   ├── realtime_pipeline.py    # Main real-time dual-sensor classification script
 │   └── ...
-├── data/                       # Raw input datasets
-├── results/                    # Output plots, benchmarks, and generated datasets
-├── firmware/                   # Arduino sketches for hardware sensors
+├── pulse_core/                 # Underlying DSP & Signal Processing Modules
+│   ├── feature_extraction.py   # Extracts P, V, T fiducials, AI, SI, etc.
+│   ├── sqi.py                  # Motion artifact rejection
+│   └── ...
+├── data/                       # Raw input datasets for simulation testing
+├── results/                    # Output plots, benchmarks, and logs
+├── firmware/                   # Arduino sketches for ESP32 hardware sensors
 ├── hardware_acquisition/       # Python serial loggers
 └── docs/                       # Walkthroughs and documentation
 ```
 
-## Features
-- **Signal-Quality-Aware Routing**: Evaluates Spectral Power Ratio (SPR), Kurtosis, and Autocorrelation (ACF) to dynamically route signals.
-- **Dual Detectors**: 
-  - `ClinicalDetector`: High-precision, Savitzky-Golay smoothed pipeline for pristine signals.
-  - `WearableDetector`: Adaptive dual-moving-average pipeline with local SNR rejection for noisy, wearable data.
-- **Robust Feature Extraction**: Extracts time-domain, frequency-domain, and non-linear morphological features.
-- **Failure Taxonomy Tracker**: Explicitly logs failure modes (e.g., Missing Fiducials, Low SNR, Numerical Instability) for downstream analysis.
-- **Real-Time Ayurvedic Dosha Pipeline**: 
-  - Live processing of Vata and Pitta sensors (MAX30102) with spatial resolution maintained.
-  - 60-second dynamic baseline calibration to adapt to physiological variance.
-  - Continuous 10-second rolling window classification mapping scientific hemodynamic features to traditional parameters (Vega, Gati, Tala, Bala, Kathinya, Akruti).
+## What Is Done So Far (Project Status)
+
+We have successfully built a full end-to-end classification pipeline:
+
+1. **Robust Feature Extraction (`pulse_core`)**
+   - Built a high-precision Digital Signal Processing (DSP) pipeline that dynamically filters wearable sensor noise.
+   - Accurately detects the Systolic Peak (P), Dicrotic Notch (V), and Tidal Wave (T).
+   - Extracts clinical cardiovascular metrics: Augmentation Index (AI), Stiffness Index (SI), and structural amplitudes ($h_1, h_2, h_3$).
+
+2. **Ayurvedic Translation Layer (`ayurveda`)**
+   - Implemented a rule-engine that translates scientific metrics into Ayurvedic diagnosis:
+     - **Vega (Rate):** Heart rate BPM (Fast = Vata, Medium = Pitta, Slow = Kapha).
+     - **Tala (Rhythm):** CVNN variance (Irregular = Vata, Regular = Pitta/Kapha).
+     - **Bala (Force):** Augmentation Index (High force = Pitta).
+     - **Kathinya (Stiffness):** Stiffness Index (Hard = Vata, Soft = Kapha).
+     - **Akruti (Volume):** Wave amplitude $h_1$ relative to baseline.
+
+3. **Dynamic Baseline Calibration (`ayurveda/calibration.py`)**
+   - Created a 60-second hardware initialization sequence that measures the unique biological baseline of each subject.
+   - Automatically drops noisy beats using a Signal Quality Index (SQI).
+   - Generates customized standard deviation thresholds ($\pm 1 \sigma$) so the classification is accurate regardless of skin tone or sensor placement.
+
+4. **True Dual-Sensor Nadi Pariksha Architecture (`scripts/realtime_pipeline.py`)**
+   - Configured the ESP32 hardware and Python routing to natively support parallel processing of both the Index Finger (Vata) and Middle Finger (Pitta) sensors.
+   - Preserves strict spatial significance by generating two distinct rolling 10-second reports rather than aggregating data.
+   - Seamlessly handles live serial data streams from the hardware and includes a `--simulate` flag for offline testing.
 
 ## Documentation
-- [Dosha Classification Walkthrough](docs/dosha_classification/walkthrough.md)
+- [Dosha Classification Walkthrough](docs/dosha_classification/walkthrough.md) - A detailed breakdown of the mathematical mapping and dual-sensor architecture.
 
 ## Version
 - Current: v1.1 (Dual-Sensor Nadi Pariksha Architecture)
