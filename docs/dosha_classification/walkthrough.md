@@ -34,16 +34,18 @@ To transition this pipeline into a robust real-time hardware application, we imp
 - Created `realtime_pipeline.py`, a dedicated inference script that listens to a data stream, forces the 60-second calibration, and then enters a continuous 10-second rolling-window classification mode.
 - Includes a `--simulate` flag to seamlessly inject existing CSV datasets (like `subject_custom_1000hz.csv`) for off-device testing.
 
-## Phase 3: True Dual-Sensor Nadi Pariksha Architecture
-To respect the spatial significance of the Ayurvedic method, the pipeline was upgraded to natively support parallel processing of both index (Vata) and middle (Pitta) finger sensors.
+## Phase 3: True Tri-Sensor Nadi Pariksha Architecture
+To respect the spatial significance of the Ayurvedic method, the pipeline was upgraded to natively support parallel processing of all three traditional pulse positions: Index finger (Vata), Middle finger (Pitta), and Ring finger (Kapha).
 
-### Firmware Fix (`max30102_acquisition.ino`)
-- Updated the serial output format to correctly label both data streams: `Vata:XXXX,Pitta:YYYY`. This guarantees the Python parser can distinguish the physical origin of each raw value.
+### Firmware Upgrade (`max30102_acquisition.ino`)
+- Added initialization and reading logic for `sensorKapha` on Multiplexer Channel 2.
+- Updated the serial output format to correctly broadcast all three data streams simultaneously: `Vata:XXXX,Pitta:YYYY,Kapha:ZZZZ`. This guarantees the Python parser can distinguish the physical origin of each raw value.
 
 ### Parallel Calibration & Inference (`realtime_pipeline.py`)
-- **Tuple Routing:** The serial reader now extracts both sensor values simultaneously and yields them as `(vata, pitta)` tuples.
-- **Dual Calibrators:** The 60-second initialization now runs two completely independent `DoshaCalibrator` instances simultaneously, generating a dedicated baseline profile for the index finger and a distinct baseline profile for the middle finger.
-- **Distinct Reporting:** During the rolling 10-second inference window, the pipeline evaluates the independent buffers sequentially, generating two distinct reports:
+- **Triplet Routing:** The serial reader now extracts all three sensor values simultaneously and yields them as `(vata, pitta, kapha)` triplets.
+- **Triple Calibrators:** The 60-second initialization now runs three completely independent `DoshaCalibrator` instances simultaneously, generating a dedicated baseline profile for each finger.
+- **Distinct Reporting:** During the rolling 10-second inference window, the pipeline evaluates the independent buffers sequentially, generating three distinct reports:
   - `========== VATA SENSOR (Index Finger) 10s Window ==========`
   - `========== PITTA SENSOR (Middle Finger) 10s Window ==========`
-- **Preserved Spatial Resolution:** By refusing to mathematically aggregate the sensors, the architecture successfully preserves the spatial diagnostic resolution. A higher-level unified meta-classifier can now easily be built on top of these distinct outputs.
+  - `========== KAPHA SENSOR (Ring Finger) 10s Window ==========`
+- **Preserved Spatial Resolution:** By refusing to mathematically aggregate the sensors, the architecture successfully preserves the spatial diagnostic resolution. A higher-level unified meta-classifier can now easily analyze the distinct combination of these three outputs to render a final holistic diagnosis.

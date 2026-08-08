@@ -20,25 +20,28 @@ SIGMA_MULTIPLIER = 1.0
 
 def run_pipeline(data_stream, initial_fs=1000.0):
     """
-    Orchestrates the calibration and continuous inference logic for dual sensors.
-    data_stream is a generator yielding tuples of (vata_value, pitta_value).
+    Orchestrates the calibration and continuous inference logic for tri-sensors.
+    data_stream is a generator yielding triplets of (vata_value, pitta_value, kapha_value).
     """
-    print(f"Starting {CALIBRATION_DURATION_SEC}-second calibration phase for both Vata & Pitta sensors. Please remain still...")
+    print(f"Starting {CALIBRATION_DURATION_SEC}-second calibration phase for Vata, Pitta & Kapha sensors. Please remain still...")
     
     vata_baseline = None
     pitta_baseline = None
+    kapha_baseline = None
     
     samples_collected = 0
     vata_buffer = []
     pitta_buffer = []
+    kapha_buffer = []
     
     start_time = time.time()
     last_print_time = start_time
     
     # 1. Calibration Phase
-    for vata_val, pitta_val in data_stream:
+    for vata_val, pitta_val, kapha_val in data_stream:
         vata_buffer.append(vata_val)
         pitta_buffer.append(pitta_val)
+        kapha_buffer.append(kapha_val)
         samples_collected += 1
         
         current_time = time.time()
@@ -62,11 +65,16 @@ def run_pipeline(data_stream, initial_fs=1000.0):
             pitta_calibrator.buffer = pitta_buffer
             pitta_calibrator.target_samples = samples_collected
             
+            kapha_calibrator = DoshaCalibrator(fs=actual_fs, duration_sec=CALIBRATION_DURATION_SEC)
+            kapha_calibrator.buffer = kapha_buffer
+            kapha_calibrator.target_samples = samples_collected
+            
             print("Computing baselines...")
             vata_baseline = vata_calibrator.calibrate()
             pitta_baseline = pitta_calibrator.calibrate()
+            kapha_baseline = kapha_calibrator.calibrate()
             
-            if vata_baseline and pitta_baseline:
+            if vata_baseline and pitta_baseline and kapha_baseline:
                 print(f"--- VATA SENSOR (Index Finger) Baseline ---")
                 print(f"  h1 Median: {vata_baseline['h1_median']:.2f} (std: {vata_baseline['h1_std']:.2f})")
                 print(f"  AI Median: {vata_baseline['ai_median']:.2f} (std: {vata_baseline['ai_std']:.2f})")
@@ -75,16 +83,21 @@ def run_pipeline(data_stream, initial_fs=1000.0):
                 print(f"  h1 Median: {pitta_baseline['h1_median']:.2f} (std: {pitta_baseline['h1_std']:.2f})")
                 print(f"  AI Median: {pitta_baseline['ai_median']:.2f} (std: {pitta_baseline['ai_std']:.2f})")
                 
+                print(f"\n--- KAPHA SENSOR (Ring Finger) Baseline ---")
+                print(f"  h1 Median: {kapha_baseline['h1_median']:.2f} (std: {kapha_baseline['h1_std']:.2f})")
+                print(f"  AI Median: {kapha_baseline['ai_median']:.2f} (std: {kapha_baseline['ai_std']:.2f})")
+                
                 FS = actual_fs # Update global FS for continuous phase
                 break
             else:
-                print("Failed to establish baseline for one or both sensors due to poor signal quality. Restarting calibration...")
+                print("Failed to establish baseline for one or more sensors due to poor signal quality. Restarting calibration...")
                 vata_buffer = []
                 pitta_buffer = []
+                kapha_buffer = []
                 samples_collected = 0
                 start_time = time.time()
 
-    if not vata_baseline or not pitta_baseline:
+    if not vata_baseline or not pitta_baseline or not kapha_baseline:
         print("Data stream ended before calibration could complete.")
         return
 
@@ -93,13 +106,15 @@ def run_pipeline(data_stream, initial_fs=1000.0):
     # 2. Continuous Inference Phase
     vata_inference_buffer = []
     pitta_inference_buffer = []
+    kapha_inference_buffer = []
     
     window_samples = int(INFERENCE_WINDOW_SEC * FS)
     detector = WearableDetector()
     
-    for vata_val, pitta_val in data_stream:
+    for vata_val, pitta_val, kapha_val in data_stream:
         vata_inference_buffer.append(vata_val)
         pitta_inference_buffer.append(pitta_val)
+        kapha_inference_buffer.append(kapha_val)
         
         if len(vata_inference_buffer) == window_samples:
             
@@ -138,20 +153,22 @@ def run_pipeline(data_stream, initial_fs=1000.0):
                         else:
                             print("No clear beats detected in this window.")
             
-            # Process both independent sensors
+            # Process all three independent sensors
             process_sensor("VATA SENSOR (Index Finger)", vata_inference_buffer, vata_baseline)
             process_sensor("PITTA SENSOR (Middle Finger)", pitta_inference_buffer, pitta_baseline)
+            process_sensor("KAPHA SENSOR (Ring Finger)", kapha_inference_buffer, kapha_baseline)
             
             # Slide window (0 overlap for this demo)
             vata_inference_buffer = []
             pitta_inference_buffer = []
+            kapha_inference_buffer = []
 
 def simulate_stream_from_csv(filepath):
-    print(f"Simulating real-time dual stream from {filepath} (This might take a moment if the file is large)")
+    print(f"Simulating real-time tri-stream from {filepath} (This might take a moment if the file is large)")
     sensor_data = load_custom_data(filepath)
-    # Yield tuples (value, value) to mock two parallel sensors
+    # Yield triplets (value, value, value) to mock three parallel sensors
     for value in sensor_data.signal:
-        yield (value, value)
+        yield (value, value, value)
 
 def live_stream_from_serial():
     import serial
@@ -182,21 +199,23 @@ def live_stream_from_serial():
         print(f"Failed to open port {port_name}: {e}")
         return
         
-    print("Connected! Reading live dual stream...")
+    print("Connected! Reading live tri-sensor stream...")
     
     ser.reset_input_buffer()
     
     while True:
         try:
             line = ser.readline().decode('utf-8', errors='ignore').strip()
-            # Expected format: "Vata:12345,Pitta:67890"
-            if line.startswith("Vata:") and "Pitta:" in line:
+            # Expected format: "Vata:12345,Pitta:67890,Kapha:13579"
+            if line.startswith("Vata:") and "Pitta:" in line and "Kapha:" in line:
                 parts = line.split(",")
                 vata_str = parts[0].split(":")[1]
                 pitta_str = parts[1].split(":")[1]
+                kapha_str = parts[2].split(":")[1]
                 vata_value = float(vata_str)
                 pitta_value = float(pitta_str)
-                yield (vata_value, pitta_value)
+                kapha_value = float(kapha_str)
+                yield (vata_value, pitta_value, kapha_value)
         except Exception:
             pass # Ignore corrupt lines during startup or transmission errors
 

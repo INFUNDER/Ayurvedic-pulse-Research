@@ -12,6 +12,7 @@
 // Create sensor objects for our specific Nadi positions
 MAX30105 sensorVata;  // Connected to Multiplexer Channel 0
 MAX30105 sensorPitta; // Connected to Multiplexer Channel 1
+MAX30105 sensorKapha; // Connected to Multiplexer Channel 2
 
 // Helper function to switch the multiplexer channel
 void tcaselect(uint8_t i) {
@@ -49,6 +50,18 @@ void setup() {
   sensorPitta.setup(); 
   sensorPitta.setPulseAmplitudeRed(0x0A); 
   sensorPitta.setPulseAmplitudeGreen(0x0A);
+
+  // --------------------------------------------------
+  // Initialize Kapha Sensor (Channel 2)
+  // --------------------------------------------------
+  tcaselect(2); 
+  if (!sensorKapha.begin(Wire, I2C_SPEED_FAST)) {
+    Serial.println("Kapha sensor not found on Channel 2. Check wiring.");
+    while (1); // Halt execution if missing
+  }
+  sensorKapha.setup(); 
+  sensorKapha.setPulseAmplitudeRed(0x0A); 
+  sensorKapha.setPulseAmplitudeGreen(0x0A);
 }
 
 void loop() {
@@ -60,12 +73,18 @@ void loop() {
   tcaselect(1); 
   long irPitta = sensorPitta.getIR();
 
+  // Read raw IR value from the Kapha position
+  tcaselect(2); 
+  long irKapha = sensorKapha.getIR();
+
   // Print the data in a format the Arduino Serial Plotter understands:
-  // "Vata:Value1,Pitta:Value2"
+  // "Vata:Value1,Pitta:Value2,Kapha:Value3"
   Serial.print("Vata:");
   Serial.print(irVata);
   Serial.print(",Pitta:");
-  Serial.println(irPitta);
+  Serial.print(irPitta);
+  Serial.print(",Kapha:");
+  Serial.println(irKapha);
 
   // A tiny delay keeps the Serial Plotter graph moving at a readable speed
   delay(10); 
