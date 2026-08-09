@@ -11,6 +11,9 @@ from pulse_core.feature_extraction import extract_all_features
 from ayurveda.ayurveda_mapper import map_to_ayurveda
 from pulse_core.sensor import load_custom_data
 import warnings
+from ayurveda.unified_classifier import UnifiedClassifier
+import csv
+from datetime import datetime
 
 # Configuration
 FS = 1000.0
@@ -23,6 +26,12 @@ def run_pipeline(data_stream, initial_fs=1000.0):
     Orchestrates the calibration and continuous inference logic for tri-sensors.
     data_stream is a generator yielding triplets of (vata_value, pitta_value, kapha_value).
     """
+    os.makedirs("results", exist_ok=True)
+    csv_filename = f"results/nadi_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    csv_file = open(csv_filename, mode='w', newline='')
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["Timestamp", "Vata_IR", "Pitta_IR", "Kapha_IR"])
+    print(f"Logging raw data to {csv_filename}")
     print(f"Starting {CALIBRATION_DURATION_SEC}-second calibration phase for Vata, Pitta & Kapha sensors. Please remain still...")
     
     vata_baseline = None
@@ -39,6 +48,7 @@ def run_pipeline(data_stream, initial_fs=1000.0):
     
     # 1. Calibration Phase
     for vata_val, pitta_val, kapha_val in data_stream:
+        csv_writer.writerow([time.time(), vata_val, pitta_val, kapha_val])
         vata_buffer.append(vata_val)
         pitta_buffer.append(pitta_val)
         kapha_buffer.append(kapha_val)
@@ -112,15 +122,19 @@ def run_pipeline(data_stream, initial_fs=1000.0):
     detector = WearableDetector()
     
     for vata_val, pitta_val, kapha_val in data_stream:
+        csv_writer.writerow([time.time(), vata_val, pitta_val, kapha_val])
         vata_inference_buffer.append(vata_val)
         pitta_inference_buffer.append(pitta_val)
         kapha_inference_buffer.append(kapha_val)
         
         if len(vata_inference_buffer) == window_samples:
             
-            def process_sensor(sensor_name, buffer, baseline):
+            def process_sensor(buffer, baseline):
                 raw_signal = np.array(buffer)
-                signal = bandpass_filter(raw_signal, 0.5, 10.0, FS)
+                try:
+                    signal = bandpass_filter(raw_signal, 0.5, 10.0, FS)
+                except ValueError:
+                    return None, "Filter error (sampling rate too low)"
                 
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -128,35 +142,57 @@ def run_pipeline(data_stream, initial_fs=1000.0):
                     sqi_metrics = calculate_sqi(signal, FS)
                     sqi_class = evaluate_signal_quality(sqi_metrics['Composite_SQI'])
                     
-                    print(f"\n========== {sensor_name} 10s Window ==========")
                     if sqi_class == 'Poor':
-                        print("[Warning] Poor signal quality detected. Artifact rejected. Please stay still.")
-                    else:
-                        det_result = detector.detect(signal, FS)
-                        if len(det_result.systolic_peaks) >= 3:
-                            det_result.confidence = 0.90 if sqi_class == 'Good' else 0.70
-                            features, status = extract_all_features(signal, FS, det_result)
-                            
-                            if status == "SUCCESS":
-                                ayur = map_to_ayurveda(features, baseline=baseline, sigma_multiplier=SIGMA_MULTIPLIER)
-                                print(f"Dominant Dosha: {ayur.get('Dominant_Dosha', 'N/A')}")
-                                scores = ayur.get('Scores', {})
-                                print(f"Scores: Vata: {scores.get('Vata', 0)}, Pitta: {scores.get('Pitta', 0)}, Kapha: {scores.get('Kapha', 0)}")
-                                print(f"Vega (Rate): {ayur.get('Vega_HeartRate_BPM', np.nan):.2f} BPM -> {ayur.get('Vega_Dosha', 'N/A')}")
-                                print(f"Gati (Movement): -> {ayur.get('Gati_Dosha', 'N/A')}")
-                                print(f"Tala (Rhythm): CVNN={ayur.get('Tala_CVNN', np.nan):.2f}% -> {ayur.get('Tala_Dosha', 'N/A')}")
-                                print(f"Bala (Force): AI={ayur.get('Bala_Augmentation_Index', np.nan):.2f} -> {ayur.get('Bala_Dosha', 'N/A')}")
-                                print(f"Kathinya (Stiffness): SI={ayur.get('Kathinya_Stiffness_Index', np.nan):.2f} -> {ayur.get('Kathinya_Dosha', 'N/A')}")
-                                print(f"Akruti (Volume): h1={ayur.get('Akruti_h1', np.nan):.2f} -> {ayur.get('Akruti_Dosha', 'N/A')}")
-                            else:
-                                print(f"Extraction Failed: {status}")
+                        return None, "Poor signal quality"
+                    
+                    det_result = detector.detect(signal, FS)
+                    if len(det_result.systolic_peaks) >= 3:
+                        det_result.confidence = 0.90 if sqi_class == 'Good' else 0.70
+                        features, status = extract_all_features(signal, FS, det_result)
+                        
+                        if status == "SUCCESS":
+                            return map_to_ayurveda(features, baseline=baseline, sigma_multiplier=SIGMA_MULTIPLIER), None
                         else:
-                            print("No clear beats detected in this window.")
+                            return None, f"Extraction Failed: {status}"
+                    else:
+                        return None, "No clear beats detected"
             
             # Process all three independent sensors
-            process_sensor("VATA SENSOR (Index Finger)", vata_inference_buffer, vata_baseline)
-            process_sensor("PITTA SENSOR (Middle Finger)", pitta_inference_buffer, pitta_baseline)
-            process_sensor("KAPHA SENSOR (Ring Finger)", kapha_inference_buffer, kapha_baseline)
+            vata_report, vata_err = process_sensor(vata_inference_buffer, vata_baseline)
+            pitta_report, pitta_err = process_sensor(pitta_inference_buffer, pitta_baseline)
+            kapha_report, kapha_err = process_sensor(kapha_inference_buffer, kapha_baseline)
+            
+            # Unify with Meta-Classifier
+            meta = UnifiedClassifier()
+            unified_result = meta.classify(vata_report, pitta_report, kapha_report)
+            
+            # Terminal Output Formatting
+            print("\n" + "="*55)
+            print("         NADI PARIKSHA UNIFIED DIAGNOSTIC")
+            print("="*55)
+            print(f"Primary Dosha:    {unified_result['Primary_Dosha']}")
+            print(f"Secondary Dosha:  {unified_result['Secondary_Dosha']}")
+            print(f"Confidence Score: {unified_result['Confidence']}%")
+            if unified_result['Confidence'] == 0:
+                print(f"Reason:           {unified_result.get('Reason', 'Unknown')}")
+            else:
+                scores = unified_result['Scores']
+                print(f"Aggregated Score: Vata: {scores['Vata']:.1f} | Pitta: {scores['Pitta']:.1f} | Kapha: {scores['Kapha']:.1f}")
+            print("-" * 55)
+            
+            def print_individual(name, report, err):
+                print(f"[{name}] ", end="")
+                if report:
+                    print(f"{report.get('Dominant_Dosha')} | Rate: {report.get('Vega_HeartRate_BPM', np.nan):.0f} BPM | Vol: {report.get('Akruti_Dosha')}")
+                else:
+                    print(f"Failed: {err}")
+                    
+            print_individual("Index Finger (Vata)  ", vata_report, vata_err)
+            print_individual("Middle Finger (Pitta)", pitta_report, pitta_err)
+            print_individual("Ring Finger (Kapha)  ", kapha_report, kapha_err)
+            print("="*55 + "\n")
+            
+            csv_file.flush() # Ensure data is written to disk
             
             # Slide window (0 overlap for this demo)
             vata_inference_buffer = []
@@ -173,8 +209,7 @@ def simulate_stream_from_csv(filepath):
 def live_stream_from_serial():
     import serial
     import serial.tools.list_ports
-    
-    BAUD_RATE = 115200 
+    BAUD_RATE = 115200
     
     print("Searching for ESP32...")
     ports = serial.tools.list_ports.comports()

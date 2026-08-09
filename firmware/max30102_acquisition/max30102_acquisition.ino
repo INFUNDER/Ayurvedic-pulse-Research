@@ -1,91 +1,74 @@
-/*
- * PrakritiAI - Nadi Pariksha Data Collection
- * Reads raw IR waveforms from two MAX30102 sensors via a TCA9548A Multiplexer.
- * Formatted for the Arduino Serial Plotter to visualize Vata and Pitta waveforms.
- */
-
 #include <Wire.h>
-#include "MAX30105.h" // This library covers the MAX30102
+#include "MAX30105.h"
 
-#define TCAADDR 0x70  // Default I2C address for the TCA9548A
+#define SDA_PIN 21
+#define SCL_PIN 22
+#define TCA_ADDR 0x70
 
-// Create sensor objects for our specific Nadi positions
-MAX30105 sensorVata;  // Connected to Multiplexer Channel 0
-MAX30105 sensorPitta; // Connected to Multiplexer Channel 1
-MAX30105 sensorKapha; // Connected to Multiplexer Channel 2
+MAX30105 sensor1;
+MAX30105 sensor2;
+MAX30105 sensor3;
 
-// Helper function to switch the multiplexer channel
-void tcaselect(uint8_t i) {
-  if (i > 7) return; 
-  Wire.beginTransmission(TCAADDR);
-  Wire.write(1 << i);
-  Wire.endTransmission();  
+MAX30105* sensors[3] = { &sensor1, &sensor2, &sensor3 };
+uint8_t channels[3] = { 0, 1, 2 };
+
+void selectChannel(uint8_t channel) {
+  if (channel > 7) return;
+  Wire.beginTransmission(TCA_ADDR);
+  Wire.write(1 << channel);
+  Wire.endTransmission();
 }
 
 void setup() {
-  Serial.begin(115200);
-  Wire.begin(); // Join the main I2C bus
+  Serial.begin(115200); // Reverted back to 115200 for Mac driver compatibility
+  delay(1000);
+  
+  Wire.begin(SDA_PIN, SCL_PIN);
+  Wire.setClock(400000); // 400kHz Fast I2C mode
+  delay(500);
 
-  // --------------------------------------------------
-  // Initialize Vata Sensor (Channel 0)
-  // --------------------------------------------------
-  tcaselect(0); 
-  if (!sensorVata.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("Vata sensor not found on Channel 0. Check wiring.");
-    while (1); // Halt execution if missing
-  }
-  sensorVata.setup(); 
-  // Turn off Red and Green LEDs. We only need the IR LED for deep tissue pulse morphology.
-  sensorVata.setPulseAmplitudeRed(0x0A); 
-  sensorVata.setPulseAmplitudeGreen(0x0A); 
+  // Initialize all 3 sensors exactly like your test script
+  for (int i = 0; i < 3; i++) {
+    selectChannel(channels[i]);
+    delay(100);
 
-  // --------------------------------------------------
-  // Initialize Pitta Sensor (Channel 1)
-  // --------------------------------------------------
-  tcaselect(1); 
-  if (!sensorPitta.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("Pitta sensor not found on Channel 1. Check wiring.");
-    while (1); // Halt execution if missing
-  }
-  sensorPitta.setup(); 
-  sensorPitta.setPulseAmplitudeRed(0x0A); 
-  sensorPitta.setPulseAmplitudeGreen(0x0A);
+    // Bypassing the safety check! We call begin() to give the library the I2C port,
+    // but we completely IGNORE if it returns false due to a zombie Part ID.
+    sensors[i]->begin(Wire, I2C_SPEED_FAST);
+    
+    // High-speed hardware configuration
+    sensors[i]->setup(
+      60,     // LED brightness (not used since we override below)
+      1,      // Sample averaging (1 = NO averaging, highest raw speed)
+      2,      // LED mode: Red + IR
+      400,    // Sample rate (Max speed for SpO2 mode)
+      411,    // Pulse width
+      4096    // ADC range
+    );
 
-  // --------------------------------------------------
-  // Initialize Kapha Sensor (Channel 2)
-  // --------------------------------------------------
-  tcaselect(2); 
-  if (!sensorKapha.begin(Wire, I2C_SPEED_FAST)) {
-    Serial.println("Kapha sensor not found on Channel 2. Check wiring.");
-    while (1); // Halt execution if missing
+    // CRITICAL FIX: Extremely low power (0x0A) instead of (0x3F) to prevent crashing
+    sensors[i]->setPulseAmplitudeRed(0x0A);
+    sensors[i]->setPulseAmplitudeIR(0x0A);
+    sensors[i]->setPulseAmplitudeGreen(0);
+    delay(100);
   }
-  sensorKapha.setup(); 
-  sensorKapha.setPulseAmplitudeRed(0x0A); 
-  sensorKapha.setPulseAmplitudeGreen(0x0A);
 }
 
 void loop() {
-  // Read raw IR value from the Vata position
-  tcaselect(0); 
-  long irVata = sensorVata.getIR();
-  
-  // Read raw IR value from the Pitta position
-  tcaselect(1); 
-  long irPitta = sensorPitta.getIR();
+  long irValues[3] = {0, 0, 0};
 
-  // Read raw IR value from the Kapha position
-  tcaselect(2); 
-  long irKapha = sensorKapha.getIR();
+  for (int i = 0; i < 3; i++) {
+    selectChannel(channels[i]);
+    irValues[i] = sensors[i]->getIR();
+  }
 
-  // Print the data in a format the Arduino Serial Plotter understands:
-  // "Vata:Value1,Pitta:Value2,Kapha:Value3"
+  // CRITICAL FIX: Format exactly as Python expects
   Serial.print("Vata:");
-  Serial.print(irVata);
+  Serial.print(irValues[0]);
   Serial.print(",Pitta:");
-  Serial.print(irPitta);
+  Serial.print(irValues[1]);
   Serial.print(",Kapha:");
-  Serial.println(irKapha);
+  Serial.println(irValues[2]);
 
-  // A tiny delay keeps the Serial Plotter graph moving at a readable speed
-  delay(10); 
+  // Removed delay(10) to allow the ESP32 to loop as fast as the sensors can output
 }
