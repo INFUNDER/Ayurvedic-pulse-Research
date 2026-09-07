@@ -21,7 +21,9 @@ class ClinicalDetector(BaseDetector):
         
         # Detect Systolic Peaks
         min_dist = int(0.3 * fs)
-        coarse_peaks, _ = scipy.signal.find_peaks(signal, distance=min_dist, prominence=0.5)
+        # Dynamic Amplitude Scaling: instead of hardcoded 0.5, use 50% of the signal's standard deviation
+        dynamic_prominence = max(0.01, np.std(signal) * 0.5)
+        coarse_peaks, _ = scipy.signal.find_peaks(signal, distance=min_dist, prominence=dynamic_prominence)
         
         # Detect Onsets
         onsets = []

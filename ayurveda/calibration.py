@@ -34,7 +34,8 @@ class DoshaCalibrator:
         raw_signal = np.array(self.buffer[:self.target_samples])
         
         # Pre-filter the entire buffer to avoid edge artifacts in windows
-        signal = bandpass_filter(raw_signal, 0.5, 10.0, self.fs)
+        # Note: We invert the signal (-) because the raw MAX30102 IR value drops during systole (blood absorbs light).
+        signal = -bandpass_filter(raw_signal, 0.5, 10.0, self.fs)
         
         # Segment into 5-second windows to filter out local artifacts and compute features
         window_size = int(5 * self.fs)

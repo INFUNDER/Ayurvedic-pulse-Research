@@ -132,7 +132,8 @@ def run_pipeline(data_stream, initial_fs=1000.0):
             def process_sensor(buffer, baseline):
                 raw_signal = np.array(buffer)
                 try:
-                    signal = bandpass_filter(raw_signal, 0.5, 10.0, FS)
+                    # Invert signal because raw MAX30102 IR drops during systole
+                    signal = -bandpass_filter(raw_signal, 0.5, 10.0, FS)
                 except ValueError:
                     return None, "Filter error (sampling rate too low)"
                 
@@ -243,14 +244,22 @@ def live_stream_from_serial():
             line = ser.readline().decode('utf-8', errors='ignore').strip()
             # Expected format: "Vata:12345,Pitta:67890,Kapha:13579"
             if line.startswith("Vata:") and "Pitta:" in line and "Kapha:" in line:
-                parts = line.split(",")
-                vata_str = parts[0].split(":")[1]
-                pitta_str = parts[1].split(":")[1]
-                kapha_str = parts[2].split(":")[1]
-                vata_value = float(vata_str)
-                pitta_value = float(pitta_str)
-                kapha_value = float(kapha_str)
-                yield (vata_value, pitta_value, kapha_value)
+                v, p, k = line.split(',')
+                vata = float(v.split(':')[1])
+                pitta = float(p.split(':')[1])
+                kapha = float(k.split(':')[1])
+                
+                # Forward-fill to fix I2C glitches (when sensor returns 0 due to 400Hz bus collision)
+                if vata == 0 and hasattr(live_stream_from_serial, 'last_vata'): vata = live_stream_from_serial.last_vata
+                if pitta == 0 and hasattr(live_stream_from_serial, 'last_pitta'): pitta = live_stream_from_serial.last_pitta
+                if kapha == 0 and hasattr(live_stream_from_serial, 'last_kapha'): kapha = live_stream_from_serial.last_kapha
+                
+                # Save state
+                live_stream_from_serial.last_vata = vata
+                live_stream_from_serial.last_pitta = pitta
+                live_stream_from_serial.last_kapha = kapha
+                
+                yield vata, pitta, kapha
         except Exception:
             pass # Ignore corrupt lines during startup or transmission errors
 

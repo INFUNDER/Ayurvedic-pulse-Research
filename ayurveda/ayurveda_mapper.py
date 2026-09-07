@@ -15,14 +15,14 @@ def map_to_ayurveda(scientific_features, baseline=None, sigma_multiplier=1.0):
     kapha_score = 0
     
     # 1. VEGA (Pulse Rate)
-    # Vata: 80 - 95 bpm, Pitta: 70 - 80 bpm, Kapha: 50 - 60 bpm
+    # Vata: 80+ bpm, Pitta: 65-80 bpm, Kapha: <65 bpm
     if 'Heart_Rate_BPM' in scientific_features:
         hr = scientific_features['Heart_Rate_BPM']
         ayurveda_profile['Vega_HeartRate_BPM'] = hr
         if hr >= 80:
             vata_score += 1
             ayurveda_profile['Vega_Dosha'] = 'Vata (Fast)'
-        elif hr >= 70:
+        elif hr >= 65:
             pitta_score += 1
             ayurveda_profile['Vega_Dosha'] = 'Pitta (Medium)'
         else:
@@ -36,7 +36,7 @@ def map_to_ayurveda(scientific_features, baseline=None, sigma_multiplier=1.0):
         if hr >= 80:
             vata_score += 1
             ayurveda_profile['Gati_Dosha'] = 'Vata (Curved/Zigzag - Snake)'
-        elif hr >= 70:
+        elif hr >= 65:
             pitta_score += 1
             ayurveda_profile['Gati_Dosha'] = 'Pitta (Hopping/Jumping - Frog)'
         else:
@@ -73,19 +73,23 @@ def map_to_ayurveda(scientific_features, baseline=None, sigma_multiplier=1.0):
                 vata_score += 1
                 ayurveda_profile['Bala_Dosha'] = 'Vata (Low Force)'
             else:
-                kapha_score += 1
-                ayurveda_profile['Bala_Dosha'] = 'Kapha (Moderate Force)'
+                vata_score += 0.33
+                pitta_score += 0.33
+                kapha_score += 0.33
+                ayurveda_profile['Bala_Dosha'] = 'Balanced (Tridoshic)'
         else:
             # Fallback static thresholds
             if ai > 0.15:
                 pitta_score += 1
                 ayurveda_profile['Bala_Dosha'] = 'Pitta (High Force)'
-            elif ai >= 0.0:
-                kapha_score += 1
-                ayurveda_profile['Bala_Dosha'] = 'Kapha (Moderate Force)'
-            else:
+            elif ai < 0.0:
                 vata_score += 1
                 ayurveda_profile['Bala_Dosha'] = 'Vata (Low Force)'
+            else:
+                vata_score += 0.33
+                pitta_score += 0.33
+                kapha_score += 0.33
+                ayurveda_profile['Bala_Dosha'] = 'Balanced (Tridoshic)'
 
     # 5. KATHINYA (Stiffness and Consistency)
     if 'Stiffness_Index' in scientific_features and not np.isnan(scientific_features['Stiffness_Index']):
@@ -120,19 +124,23 @@ def map_to_ayurveda(scientific_features, baseline=None, sigma_multiplier=1.0):
                 vata_score += 1
                 ayurveda_profile['Akruti_Dosha'] = 'Vata (Low Volume)'
             else:
-                kapha_score += 1
-                ayurveda_profile['Akruti_Dosha'] = 'Kapha (Average Volume)'
+                vata_score += 0.33
+                pitta_score += 0.33
+                kapha_score += 0.33
+                ayurveda_profile['Akruti_Dosha'] = 'Balanced (Tridoshic)'
         else:
             # Fallback static thresholds
             if h1 < 5000: 
                 vata_score += 1
                 ayurveda_profile['Akruti_Dosha'] = 'Vata (Low Volume)'
-            elif h1 < 20000:
-                kapha_score += 1
-                ayurveda_profile['Akruti_Dosha'] = 'Kapha (Average Volume)'
-            else:
+            elif h1 > 20000:
                 pitta_score += 1
                 ayurveda_profile['Akruti_Dosha'] = 'Pitta (High Volume)'
+            else:
+                vata_score += 0.33
+                pitta_score += 0.33
+                kapha_score += 0.33
+                ayurveda_profile['Akruti_Dosha'] = 'Balanced (Tridoshic)'
 
     ayurveda_profile['Scores'] = {
         'Vata': vata_score,
