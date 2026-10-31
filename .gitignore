@@ -1,4 +1,10 @@
 __pycache__/
 *.pyc
-results/*.csv
 .DS_Store
+
+# generated outputs
+results/
+
+# human recordings stay local (privacy); clinical downloads are re-fetchable
+data/sessions/
+data/vitaldb_clinical/

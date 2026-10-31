@@ -1,61 +1,89 @@
-# Ayurvedic Nadi Pariksha (Pulse Diagnosis) System
+# Ayurvedic Nadi Pariksha – adaptive pulse processing
 
-This repository contains a complete hardware and software pipeline designed for real-time Ayurvedic Dosha Classification (Vata, Pitta, Kapha) using optical PPG sensors (MAX30102). 
+Wristband with **3× MAX30102** (optical PPG) and **3× FSR402** (contact force)
+over the Vata / Pitta / Kapha positions of the radial artery, plus a signal
+pipeline that removes noise **without person-specific hand-tuned thresholds**.
 
-By extracting advanced hemodynamic features from the human pulse wave, this system mathematically maps scientific cardiovascular metrics to the traditional Ayurvedic parameters described in ancient texts (Vega, Gati, Tala, Bala, Kathinya, and Akruti).
+> Current phase (see [RESEARCH.md](RESEARCH.md)): build and validate the
+> adaptive denoiser *before* any dosha classifier. No dosha labels are needed
+> for this phase; the denoiser is validated against known ground truth.
 
-## Repository Structure
-
-To make this codebase approachable for new researchers and developers, the logic is cleanly separated:
+## Layout
 
 ```text
 pulse_acquisition_system/
-├── ayurveda/                   # Nadi Pariksha Ayurvedic Logic (The Core Focus)
-│   ├── ayurveda_mapper.py      # Maps hemodynamic features to Vata/Pitta/Kapha
-│   └── calibration.py          # 60-second baseline stabilization
-├── scripts/                    # Executable Entry Points
-│   ├── realtime_pipeline.py    # Main real-time dual-sensor classification script
-│   └── ...
-├── pulse_core/                 # Underlying DSP & Signal Processing Modules
-│   ├── feature_extraction.py   # Extracts P, V, T fiducials, AI, SI, etc.
-│   ├── sqi.py                  # Motion artifact rejection
-│   └── ...
-├── data/                       # Raw input datasets for simulation testing
-├── results/                    # Output plots, benchmarks, and logs
-├── firmware/                   # Arduino sketches for ESP32 hardware sensors
-├── hardware_acquisition/       # Python serial loggers
-└── docs/                       # Walkthroughs and documentation
+├── firmware/nadi_tri_sensor/   ESP32 + TCA9548A: 3x PPG (IR+Red) + 3x FSR @ 100 Hz, start-up auto-gain
+├── pulse_core/                 the adaptive pipeline
+│   ├── io.py                   load any session CSV -> uniform grid + validity mask
+│   ├── preprocess.py           AC/DC normalisation, FSR contact-force cancellation
+│   ├── hr_tracker.py           3-channel spectral fusion + Viterbi heart-rate track
+│   ├── adaptive_filter.py      HR-tracking band-pass + BayesShrink wavelet denoising
+│   ├── beats.py                HR-informed beat detection
+│   ├── quality.py              per-subject beat template + robust beat quality
+│   ├── features.py             ensemble-beat morphology, rhythm, perfusion
+│   ├── pressure.py             pressure-sweep calibration (per-person optimal force)
+│   ├── pipeline.py             run_pipeline(): stages wired together, ablation switches
+│   └── synth.py                synthetic subjects + realistic noise (ground truth)
+├── scripts/
+│   ├── record_session.py       serial -> data/sessions/*.csv, optional live quality monitor
+│   ├── analyze_session.py      report + figure + feature CSV for any recording
+│   ├── benchmark_denoising.py  v1 vs adaptive, synthetic + VitalDB, label-free metrics
+│   └── fetch_vitaldb.py        download clean clinical PPG for the benchmark
+├── tests/test_pipeline.py
+└── data/                       custom_radial/ (tracked), sessions/ + vitaldb_clinical/ (local only)
 ```
 
-## What Is Done So Far (Project Status)
+Legacy v1 code (rule-based dosha mapper, Pulse-Mamba model, old scripts) is in
+`../_archive/pulse_acquisition_system_v1/` and in git history.
 
-We have successfully built a full end-to-end classification pipeline:
+## Quick start
 
-1. **Robust Feature Extraction (`pulse_core`)**
-   - Built a high-precision Digital Signal Processing (DSP) pipeline that dynamically filters wearable sensor noise.
-   - Accurately detects the Systolic Peak (P), Dicrotic Notch (V), and Tidal Wave (T).
-   - Extracts clinical cardiovascular metrics: Augmentation Index (AI), Stiffness Index (SI), and structural amplitudes ($h_1, h_2, h_3$).
+```bash
+cd pulse_acquisition_system
+../venv/bin/pip install -r requirements.txt
+../venv/bin/python tests/test_pipeline.py              # or: python -m pytest tests
+../venv/bin/python scripts/benchmark_denoising.py      # ~45 s
+../venv/bin/python scripts/analyze_session.py data/custom_radial/subject_custom_1000hz.csv
+```
 
-2. **Ayurvedic Translation Layer (`ayurveda`)**
-   - Implemented a rule-engine that translates scientific metrics into Ayurvedic diagnosis:
-     - **Vega (Rate):** Heart rate BPM (Fast = Vata, Medium = Pitta, Slow = Kapha).
-     - **Tala (Rhythm):** CVNN variance (Irregular = Vata, Regular = Pitta/Kapha).
-     - **Bala (Force):** Augmentation Index (High force = Pitta).
-     - **Kathinya (Stiffness):** Stiffness Index (Hard = Vata, Soft = Kapha).
-     - **Akruti (Volume):** Wave amplitude $h_1$ relative to baseline.
+Recording with the band (after flashing `firmware/nadi_tri_sensor`):
 
-3. **Dynamic Baseline Calibration (`ayurveda/calibration.py`)**
-   - Created a 60-second hardware initialization sequence that measures the unique biological baseline of each subject.
-   - Automatically drops noisy beats using a Signal Quality Index (SQI).
-   - Generates customized standard deviation thresholds ($\pm 1 \sigma$) so the classification is accurate regardless of skin tone or sensor placement.
+```bash
+../venv/bin/python scripts/record_session.py --subject S01 --protocol rest --monitor
+../venv/bin/python scripts/record_session.py --subject S01 --protocol sweep --duration 90
+../venv/bin/python scripts/analyze_session.py data/sessions/S01_sweep_*.csv --sweep
+```
 
-4. **True Dual-Sensor Nadi Pariksha Architecture (`scripts/realtime_pipeline.py`)**
-   - Configured the ESP32 hardware and Python routing to natively support parallel processing of both the Index Finger (Vata) and Middle Finger (Pitta) sensors.
-   - Preserves strict spatial significance by generating two distinct rolling 10-second reports rather than aggregating data.
-   - Seamlessly handles live serial data streams from the hardware and includes a `--simulate` flag for offline testing.
+In code:
 
-## Documentation
-- [Dosha Classification Walkthrough](docs/dosha_classification/walkthrough.md) - A detailed breakdown of the mathematical mapping and dual-sensor architecture.
+```python
+from pulse_core import load_session, run_pipeline
+res = run_pipeline(load_session("data/sessions/S01_rest_....csv"))
+for ch in res.channels:
+    print(ch.name, ch.acceptance, ch.features)
+```
 
-## Version
-- Current: v1.1 (Dual-Sensor Nadi Pariksha Architecture)
+## Pipeline
+
+```text
+raw IR counts ─► AC/DC (%) ─► HR track f0(t) ─► FSR force cancel ─► HP 0.5·f0 ─► wavelet ─► LP 8·f0
+                                   │                                                        │
+                                   └──────────── beat detection (spacing from f0) ◄─────────┘
+                                                        │
+                    per-subject template + robust z-scores + cross-channel check
+                                                        │
+                              accepted beats ─► ensemble beat ─► features
+```
+
+## Benchmark (20 synthetic subjects + 6 VitalDB pulses, two noise levels)
+
+| metric (mean) | v1 fixed band-pass | adaptive (full) |
+|---|---|---|
+| accepted beats that are actually clean | 83–92 % | **99.8–100 %** |
+| HR error, synthetic moderate / heavy | 4.0 / 5.6 bpm | **1.6 / 2.9 bpm** |
+| worst-decile ensemble-beat correlation | 0.92–0.97 | **0.97–0.99** |
+| rise-time error, heavy noise | 22–27 ms | **15–16 ms** |
+| beats kept (yield) | ~100 % | 50–74 % |
+
+Full tables are written to `results/benchmark_summary_*.csv`. Details,
+limitations and real-data findings are in [RESEARCH.md](RESEARCH.md).
