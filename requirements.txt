@@ -1,0 +1,7 @@
+numpy>=1.26
+scipy>=1.11
+pandas>=2.0
+PyWavelets>=1.5
+matplotlib>=3.8
+pyserial>=3.5
+pytest>=8.0  # dev: python -m pytest tests
